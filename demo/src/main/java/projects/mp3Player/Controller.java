@@ -8,7 +8,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
-import javafx.collections.SetChangeListener;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -21,6 +20,10 @@ import javafx.scene.layout.Pane;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.util.Duration;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import java.util.Arrays;
+import java.util.Comparator;
 
 public class Controller implements Initializable {
 
@@ -38,7 +41,8 @@ public class Controller implements Initializable {
     private Slider volume_Slider;
     @FXML
     private ProgressBar song_progressbar;
-    @
+    @FXML
+    private ImageView coverImg;
 
     // Media Player
     private Media media;
@@ -49,6 +53,7 @@ public class Controller implements Initializable {
     private File[] files;
 
     private ArrayList<File> songs; // basically the playlist
+    private ArrayList<File> covers;
 
     private int songNumber; // Which song currently plays
     private int[] speeds = {25, 50, 75, 100, 125, 150, 175, 200}; // Amount of choosable speeds
@@ -60,15 +65,27 @@ public class Controller implements Initializable {
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         songs = new ArrayList<File>();
+        covers = new ArrayList<File>();
 
         directory = new File("music");
-        files = directory.listFiles(); // <- this methods will get all the files inside the directory
+        files = directory.listFiles((dir, name) -> name.toLowerCase().endsWith(".mp3"));
 
         if(files != null){
+            Arrays.sort(files, Comparator.comparing(File::getName));
             for(File file : files){
                 songs.add(file);
                 System.out.println(file);
             }
+        }
+
+        File pictureDir = new File("pictures");
+        File[] imageFiles = pictureDir.listFiles((dir, name) ->
+                name.toLowerCase().matches(".*\\.(jpg|jpeg|png)")
+        );
+
+        if(imageFiles != null){
+            Arrays.sort(imageFiles, Comparator.comparing(File::getName));
+            covers.addAll(Arrays.asList(imageFiles));
         }
 
         setMedia();
@@ -90,12 +107,20 @@ public class Controller implements Initializable {
         song_progressbar.setStyle("-fx-accent: #5f5baf");
     }
 
-    public void setMedia(){
+    public void setMedia() {
 
-        media = new Media(songs.get(songNumber).toURI().toString());
+        File song = songs.get(songNumber);
+
+        media = new Media(song.toURI().toString());
         mediaPlayer = new MediaPlayer(media);
 
-        song_label.setText(songs.get(songNumber).getName());
+        song_label.setText(song.getName());
+
+        if(songNumber < covers.size()){
+            coverImg.setImage(new Image(covers.get(songNumber).toURI().toString()));
+        } else {
+            coverImg.setImage(null);
+        }
     }
 
     public void play_media(){
@@ -119,32 +144,25 @@ public class Controller implements Initializable {
 
         if(songNumber > 0){
             songNumber--;
-
-            mediaPlayer.stop();
-
-            if(running) cancel_timer();
-            setMedia();
         } else {
-            mediaPlayer.stop();
-            if(running) cancel_timer();
             songNumber = songs.size()-1;
-            setMedia();
         }
+
+        mediaPlayer.stop();
+        if(running) cancel_timer();
+        setMedia();
     }
 
     public void next_media(){
         if(songNumber < songs.size() - 1){
             songNumber++;
-
-            mediaPlayer.stop();
-            if(running) cancel_timer();
-            setMedia();
         } else {
-            mediaPlayer.stop();
-            if(running) cancel_timer();
             songNumber = 0;
-            setMedia();
         }
+
+        mediaPlayer.stop();
+        if(running) cancel_timer();
+        setMedia();
     }
 
     public void change_speed(ActionEvent event){
@@ -156,8 +174,6 @@ public class Controller implements Initializable {
             mediaPlayer.setRate(Integer.parseInt(
                     speed_combBox.getValue().substring(0,speed_combBox.getValue().length() - 1)) * 0.01); // <- mit %
         }
-
-
     }
 
     public void begin_timer(){
@@ -169,8 +185,7 @@ public class Controller implements Initializable {
                 running = true;
                 double current = mediaPlayer.getCurrentTime().toSeconds();
                 double end = media.getDuration().toSeconds();
-                System.out.println(current/end);
-                song_progressbar.setProgress(current/end);
+                song_progressbar.setProgress(end > 0 ? current/end : 0);
 
                 if(current/end == 1){
                     cancel_timer();
@@ -184,5 +199,4 @@ public class Controller implements Initializable {
         running = false;
         timer.cancel();
     }
-
 }
